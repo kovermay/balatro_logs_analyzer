@@ -289,6 +289,8 @@ select.pill:hover { border-color: var(--muted-2); }
 .joker.ed-polychrome { border-color: transparent; background: linear-gradient(170deg,#3a2742,#26322e); box-shadow: 0 0 18px rgba(180,120,255,.3); }
 .joker.ed-polychrome::before { content:''; position:absolute; inset:-1px; border-radius:12px; padding:1px; background:linear-gradient(135deg,#ff5a5a,#5a8cff,#5aff96,#ffcf5a); -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0); -webkit-mask-composite:xor; mask-composite:exclude; pointer-events:none; }
 .joker.ed-negative { background: linear-gradient(170deg,#15131f,#0f0e17); border-color: rgba(140,90,240,.55); box-shadow: 0 0 18px rgba(140,90,240,.4); }
+.joker.ed-negative .jart { background: #0f0e17 !important; }
+.joker.ed-negative .jart img { filter: invert(1); }
 .edition-tag {
   font-size: 9px; font-weight: 800; letter-spacing: .4px; text-transform: uppercase;
   padding: 1px 6px; border-radius: 5px;
