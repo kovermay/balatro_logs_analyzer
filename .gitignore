@@ -1,0 +1,9 @@
+node_modules/
+data/*.json
+config.local.json
+*.log
+.claude/
+.DS_Store
+Thumbs.db
+*.exe
+upload-to-github.bat

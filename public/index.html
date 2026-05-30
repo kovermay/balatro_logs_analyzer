@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Balatro MP — Log Viewer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Chivo+Mono:wght@500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand" id="brand">
+      <span class="brand-pip">♠</span>
+      <span class="brand-pip red">♥</span>
+      <div class="brand-text">
+        <strong>Balatro <span>Multiplayer</span></strong>
+        <small>Log Viewer</small>
+      </div>
+    </div>
+    <nav class="mainnav" id="mainnav">
+      <a href="#/games" data-route="games">All Games</a>
+      <a href="#/favorites" data-route="favorites">★ Favorites</a>
+      <a href="#/stats" data-route="stats">Stats</a>
+      <a href="#/settings" data-route="settings">⚙ Settings</a>
+    </nav>
+    <div class="topbar-right">
+      <span id="game-count" class="muted"></span>
+    </div>
+  </header>
+
+  <main id="app">
+    <div class="loading">Loading games…</div>
+  </main>
+
+  <div id="toast" class="toast"></div>
+  <footer class="footer">
+    <span id="logdir" class="muted"></span>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
