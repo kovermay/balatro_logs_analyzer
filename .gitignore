@@ -7,6 +7,6 @@ config.local.json
 Thumbs.db
 *.exe
 upload-to-github.bat
-# joker sprite images (kept local; game art isn't redistributed in the repo)
-/jokers/
-public/assets/jokers/
+balatro_parser/
+Balatro.exe
+# DO NOT ADD GAME SPRITES TO GITIGNORE, I DONT CARE ABOUT COPYRIGHT

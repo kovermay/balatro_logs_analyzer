@@ -210,6 +210,9 @@ select.pill:hover { border-color: var(--muted-2); }
 .kv .v.mono { font-family: var(--mono); font-weight: 700; }
 .flag-yes { color: var(--green); } .flag-no { color: var(--muted); }
 .stake-pip { width: 13px; height: 13px; border-radius: 50%; box-shadow: 0 0 0 2px rgba(255,255,255,.15) inset; }
+.stake-img { width: 18px; height: 18px; object-fit: contain; image-rendering: pixelated; vertical-align: middle; }
+.kv .v.with-icon { gap: 9px; }
+.kv .v.with-icon .stake-img { width: 22px; height: 22px; }
 
 /* player header inside two-col panels */
 .player-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
@@ -230,19 +233,34 @@ select.pill:hover { border-color: var(--muted-2); }
 .deck-view { margin-top: 14px; }
 .suit-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
 .suit-row .suit-label { width: 22px; font-size: 18px; font-weight: 800; text-align: center; }
-.cards-wrap { display: flex; flex-wrap: wrap; gap: 5px; }
+.cards-wrap { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* Cards, jokers and vouchers all share one footprint (see --card-w). */
+:root { --card-w: 78px; }
 
 .pcard {
   position: relative;
-  width: 38px; height: 52px; border-radius: 6px;
+  width: var(--card-w); aspect-ratio: 71 / 95; border-radius: 8px;
   background: #f4f1e8; color: #21242c;
   border: 1px solid rgba(0,0,0,.25);
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   font-weight: 800; line-height: 1; box-shadow: 0 2px 5px rgba(0,0,0,.3);
-  font-size: 13px;
+  font-size: 26px; overflow: hidden;
 }
-.pcard .r { font-size: 13px; }
-.pcard .s { font-size: 12px; margin-top: 1px; }
+.pcard .enh-fill { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; image-rendering: pixelated; pointer-events: none; z-index: 0; }
+/* real card-face sprite sits above the card body / enhancement texture */
+.pcard .card-face { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; pointer-events: none; z-index: 1; }
+.pcard .r, .pcard .s { position: relative; z-index: 1; }
+.pcard .r { font-size: 26px; }
+.pcard .s { font-size: 22px; margin-top: 2px; }
+/* once the face sprite loads, drop the font fallback */
+.pcard.has-face .r, .pcard.has-face .s { display: none; }
+/* font fallback gets a white outline so it reads on any enhancement texture */
+.pcard:has(.enh-fill) .r, .pcard:has(.enh-fill) .s {
+  text-shadow: -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff, 0 0 2px #fff;
+}
+/* negative playing cards: lighten the dark pips so they read on the dark body */
+.pcard.ed-negative .card-face { filter: invert(1) hue-rotate(180deg); }
 .pcard.suit-H, .pcard.suit-D { color: var(--red-deep); }
 .pcard.suit-S, .pcard.suit-C { color: #20242c; }
 /* enhancements */
@@ -254,9 +272,10 @@ select.pill:hover { border-color: var(--muted-2); }
 .pcard.enh-m_bonus { background: linear-gradient(145deg,#8fd0ff,#4ca7ea); color:#08243a; }
 .pcard.enh-m_wild  { background: linear-gradient(145deg,#ffd0a8,#ff9f6e); color:#3a1a06; }
 .pcard.enh-m_lucky { background: linear-gradient(145deg,#a8f0c0,#5ed18c); color:#0c2b1d; }
-.pcard .seal { position: absolute; top: 3px; left: 3px; width: 8px; height: 8px; border-radius: 50%; box-shadow: 0 0 0 1px rgba(0,0,0,.3); }
+.pcard .seal { position: absolute; top: 5px; left: 5px; width: 14px; height: 14px; border-radius: 50%; box-shadow: 0 0 0 1px rgba(0,0,0,.3); }
+.pcard .seal-img { position: absolute; top: 4px; left: 4px; width: 22px; height: 22px; object-fit: contain; image-rendering: pixelated; pointer-events: none; z-index: 3; }
 .pcard.ed-foil::after, .pcard.ed-holo::after, .pcard.ed-polychrome::after, .pcard.ed-negative::after {
-  content: ''; position: absolute; inset: 0; border-radius: 6px; pointer-events: none; mix-blend-mode: screen;
+  content: ''; position: absolute; inset: 0; border-radius: 8px; pointer-events: none; mix-blend-mode: screen; z-index: 2;
 }
 .pcard.ed-foil::after { background: linear-gradient(135deg, rgba(110,200,255,.55), rgba(180,140,255,.25)); }
 .pcard.ed-holo::after { background: linear-gradient(135deg, rgba(255,120,170,.4), rgba(120,255,210,.4)); }
@@ -264,9 +283,10 @@ select.pill:hover { border-color: var(--muted-2); }
 .pcard.ed-negative { background: #14131d; color: #d9d4ff; box-shadow: 0 0 10px rgba(140,90,240,.5); }
 
 /* ----------------------------- Jokers ----------------------------- */
+.joker-count { font-size: 11px; font-weight: 700; color: var(--muted); background: var(--bg-2); border: 1px solid var(--line); border-radius: 999px; padding: 1px 9px; }
 .joker-row { display: flex; flex-wrap: wrap; gap: 12px; }
 .joker {
-  position: relative; width: 92px; min-height: 124px;
+  position: relative; width: calc(var(--card-w) + 14px);
   border-radius: 12px; padding: 8px 7px;
   background: linear-gradient(170deg, #2b3142, #1e2230);
   border: 1px solid var(--line);
@@ -274,7 +294,7 @@ select.pill:hover { border-color: var(--muted-2); }
   box-shadow: var(--shadow-sm);
 }
 .joker .jart {
-  width: 100%; aspect-ratio: 1/1; border-radius: 8px;
+  width: 100%; aspect-ratio: 71 / 95; border-radius: 8px;
   background: radial-gradient(circle at 50% 35%, #3a4357, #232838);
   display: flex; align-items: center; justify-content: center;
   font-size: 26px; color: var(--gold); position: relative; overflow: hidden;
@@ -300,18 +320,23 @@ select.pill:hover { border-color: var(--muted-2); }
 .edition-tag.polychrome { color:#1a0a2a; background: linear-gradient(90deg,#ff8a8a,#8ab0ff,#8affc0); }
 .edition-tag.negative { color:#d9d4ff; background:#2a2440; box-shadow: inset 0 0 0 1px rgba(140,90,240,.6); }
 .sticker-tag { font-size:9px; font-weight:700; color: var(--muted); }
+.joker-sticker { width: 20px; height: 20px; object-fit: contain; image-rendering: pixelated; vertical-align: middle; }
 
 /* ----------------------------- Vouchers ----------------------------- */
-.voucher-row { display: flex; flex-wrap: wrap; gap: 10px; }
+/* same card tile as jokers (vertical: card art on top, name below) */
+.voucher-row { display: flex; flex-wrap: wrap; gap: 12px; }
 .voucher {
-  position: relative; padding: 9px 14px 9px 30px; border-radius: 9px;
-  background: linear-gradient(160deg,#33384a,#262b38);
-  border: 1px solid var(--line); font-weight: 700; font-size: 13px;
+  position: relative; width: calc(var(--card-w) + 14px);
+  display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center;
+  padding: 8px 7px; border-radius: 12px;
+  background: linear-gradient(170deg,#33384a,#262b38);
+  border: 1px solid var(--line); font-weight: 700; box-shadow: var(--shadow-sm);
 }
-.voucher::before {
-  content: '🎟'; position: absolute; left: 9px; top: 50%; transform: translateY(-50%); font-size: 14px; filter: saturate(.6);
-}
-.voucher::after { content:''; position:absolute; left:24px; top:6px; bottom:6px; width:1px; border-left:1px dashed rgba(255,255,255,.14); }
+.voucher-img { width: 100%; aspect-ratio: 71 / 95; object-fit: contain; image-rendering: pixelated; border-radius: 8px; filter: drop-shadow(0 1px 3px rgba(0,0,0,.5)); }
+.voucher-name { font-size: 11px; font-weight: 700; line-height: 1.2; color: var(--text); }
+
+/* deck back image in details */
+.deck-img { width: 30px; height: 40px; object-fit: contain; image-rendering: pixelated; vertical-align: middle; border-radius: 3px; }
 
 /* ----------------------------- Tables ----------------------------- */
 .tbl { width: 100%; border-collapse: collapse; font-size: 14px; }
