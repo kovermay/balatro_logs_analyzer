@@ -183,6 +183,20 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
+    if (pathname === '/api/sprites' && req.method === 'GET') {
+      // Catalog of every extracted sprite, grouped by folder (used by demo.html).
+      const SPRITES_DIR = path.join(PUBLIC_DIR, 'assets', 'sprites');
+      const out = {};
+      try {
+        for (const folder of fs.readdirSync(SPRITES_DIR)) {
+          const dir = path.join(SPRITES_DIR, folder);
+          if (!fs.statSync(dir).isDirectory()) continue;
+          out[folder] = fs.readdirSync(dir).filter((f) => f.toLowerCase().endsWith('.png')).sort();
+        }
+      } catch (_) {}
+      return sendJson(res, 200, { sprites: out });
+    }
+
     if (pathname === '/api/validate-dir' && req.method === 'GET') {
       const c = countLogs(query.path || '');
       return sendJson(res, 200, { accessible: c !== null, logCount: c || 0 });

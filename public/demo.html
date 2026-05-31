@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sprite & Component Demo — Balatro Log Viewer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Chivo+Mono:wght@400;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    /* demo-only layout */
+    #demo { max-width: 1240px; margin: 0 auto; padding: 26px; }
+    .demo-banner { background: linear-gradient(90deg, rgba(254,95,85,.14), rgba(76,167,234,.12)); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 20px; margin-bottom: 22px; }
+    .demo-banner h1 { margin: 0 0 4px; font-size: 22px; }
+    .demo-banner p { margin: 0; color: var(--muted); font-size: 13.5px; }
+    .demo-sub { color: var(--muted); font-size: 12.5px; margin: -8px 0 14px; }
+    .tile-grid { display: flex; flex-wrap: wrap; gap: 14px; }
+    .tile { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 88px; text-align: center; }
+    .tile .cap { font-size: 11px; color: var(--muted); line-height: 1.25; }
+    .deck-card { width: 60px; height: 80px; object-fit: contain; image-rendering: pixelated; border-radius: 5px; box-shadow: var(--shadow-sm); background: var(--bg-2); }
+    .deck-card.missing { display: flex; align-items: center; justify-content: center; font-size: 10px; color: var(--muted-2); border: 1px dashed var(--line); }
+    .stake-tile { display: flex; align-items: center; gap: 8px; background: var(--bg-2); border: 1px solid var(--line); border-radius: 9px; padding: 7px 12px; }
+    .stake-tile .stake-img { width: 24px; height: 24px; }
+    .swatch-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 12px; }
+    .kv-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px 22px; }
+    /* full catalog */
+    .cat-count { margin-left: 8px; font-size: 11px; font-weight: 700; color: var(--muted); background: var(--bg-2); border: 1px solid var(--line); border-radius: 999px; padding: 1px 9px; }
+    .cat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); gap: 12px; }
+    .cat-tile { display: flex; flex-direction: column; align-items: center; gap: 5px; text-align: center; }
+    .cat-img { image-rendering: pixelated; background: var(--bg-2); border-radius: 5px; }
+    .cat-img.card { width: 60px; height: 80px; object-fit: contain; box-shadow: var(--shadow-sm); }
+    .cat-img.square { width: 44px; height: 44px; object-fit: contain; }
+    .cat-cap { font-size: 10px; color: var(--muted); line-height: 1.2; word-break: break-word; font-family: var(--mono); }
+    .cat-missing .cat-img { display: flex; align-items: center; justify-content: center; }
+    .cat-missing { opacity: .4; }
+  </style>
+</head>
+<body>
+  <!-- elements app.js touches on load (kept hidden; the demo reuses app.js's render fns) -->
+  <div id="brand" style="display:none"></div>
+  <div id="app" style="display:none"></div>
+  <div id="game-count" style="display:none"></div>
+  <div id="logdir" style="display:none"></div>
+  <div id="toast" class="toast"></div>
+
+  <div id="demo"></div>
+
+  <script src="app.js"></script>
+  <script>
+  /* The demo renders every visual permutation using the SAME component
+     functions the real app uses (jokerCard, playingCard, deckView, stakePip,
+     voucherChip, deckSpriteKey), so anything that renders here renders there. */
+  (function () {
+    const root = document.getElementById('demo');
+    const sections = [];
+    const sect = (title, sub, body) =>
+      sections.push(`<div class="panel"><h2><span class="accent"></span>${title}</h2>${sub ? `<div class="demo-sub">${sub}</div>` : ''}${body}</div>`);
+
+    /* ---- 1. Deck backs (all decks) ---- */
+    const DECKS = [
+      'Red Deck', 'Blue Deck', 'Yellow Deck', 'Green Deck', 'Black Deck', 'Magic Deck',
+      'Nebula Deck', 'Ghost Deck', 'Abandoned Deck', 'Checkered Deck', 'Zodiac Deck',
+      'Painted Deck', 'Anaglyph Deck', 'Plasma Deck', 'Erratic Deck', 'Challenge Deck',
+      'Cocktail Deck', 'Violet Deck', 'Orange Deck', 'Heidelberg Deck',
+    ];
+    const deckTiles = DECKS.map((name) => {
+      const key = deckSpriteKey({ deckName: name });
+      return `<div class="tile">
+        <img class="deck-card" src="assets/sprites/backs/${key}.png" alt="${name}"
+             onerror="this.classList.add('missing');this.removeAttribute('src');this.textContent='no sprite';">
+        <span class="cap">${name}<br><span class="mono" style="color:var(--muted-2)">${key}</span></span>
+      </div>`;
+    }).join('');
+    sect('Deck Backs', 'Pretty deck names mapped to <code>b_*</code> sprite keys, including the MP decks (Cocktail/Violet/Orange/Heidelberg) from the mod asset pack.', `<div class="tile-grid">${deckTiles}</div>`);
+
+    /* ---- 2. Stakes ---- */
+    const STAKE_NAMES = ['White', 'Red', 'Green', 'Black', 'Blue', 'Purple', 'Orange', 'Gold'];
+    const stakeColors = { White: '#cdd2da', Red: '#e35646', Green: '#56a86c', Black: '#5f6b7a', Blue: '#4c8fbd', Purple: '#7d5bbe', Orange: '#e08e3c', Gold: '#e0b13c' };
+    const stakeTiles = STAKE_NAMES.map((n) => {
+      const info = { name: n + ' Stake', color: stakeColors[n] };
+      return `<div class="stake-tile">${stakePip(info)}<span>${n} Stake</span></div>`;
+    }).join('');
+    sect('Stakes', 'Chips re-cropped to their real bounding box (were tiny, cut at the playing-card template).', `<div class="tile-grid">${stakeTiles}</div>`);
+
+    /* ---- 3. Game Details mini-panel (deck + stake icons in context) ---- */
+    sect('Game Details — deck & stake in context', null, `<div class="kv-grid">
+      ${kv('Deck', `<img class="deck-img" src="assets/sprites/backs/b_anaglyph.png" onerror="this.remove()"> Anaglyph Deck`, 'with-icon')}
+      ${kv('Stake', stakePip({ name: 'Gold Stake', color: '#e0b13c' }) + ' Gold Stake', 'with-icon')}
+    </div>`);
+
+    /* ---- 4. Jokers ---- */
+    const J = (key, name, edition, stickers) => ({ key, name, edition: edition || null, stickers: stickers || [] });
+
+    const vanilla = [
+      J('j_joker', 'Joker'), J('j_blueprint', 'Blueprint'), J('j_baron', 'Baron'),
+      J('j_egg', 'Egg'), J('j_misprint', 'Misprint'), J('j_fibonacci', 'Fibonacci'),
+    ];
+    sect('Jokers — vanilla art', null, `<div class="joker-row">${vanilla.map(jokerCard).join('')}</div>`);
+
+    const editions = [
+      J('j_joker', 'Joker (Foil)', 'foil'), J('j_joker', 'Joker (Holo)', 'holo'),
+      J('j_joker', 'Joker (Poly)', 'polychrome'), J('j_joker', 'Joker (Negative)', 'negative'),
+    ];
+    sect('Jokers — editions', 'Negative jokers invert the art (per a prior fix).', `<div class="joker-row">${editions.map(jokerCard).join('')}</div>`);
+
+    const stick = [
+      J('j_blueprint', 'Eternal', null, ['Eternal']),
+      J('j_baron', 'Perishable', null, ['Perishable']),
+      J('j_egg', 'Rental', null, ['Rental']),
+      J('j_misprint', 'Eternal + Foil', 'foil', ['Eternal']),
+    ];
+    sect('Jokers — stickers', 'Eternal / Perishable / Rental stickers (re-cropped to true size).', `<div class="joker-row">${stick.map(jokerCard).join('')}</div>`);
+
+    const mpFallback = [
+      J('j_mp_bloodstone', 'Bloodstone'), J('j_mp_hanging_chad', 'Hanging Chad'),
+      J('j_mp_seltzer', 'Seltzer'), J('j_mp_ticket', 'Golden Ticket'),
+      J('j_mp_turtle_bean', 'Turtle Bean'),
+    ];
+    sect('MP jokers with vanilla sprites', 'These are multiplayer re-implementations of vanilla jokers. They now fall back to the vanilla art (was the "missing picture" bug for Bloodstone, Hanging Chad, Seltzer).', `<div class="joker-row">${mpFallback.map(jokerCard).join('')}</div>`);
+
+    const mpOnly = [
+      J('j_mp_pizza', 'Pizza'), J('j_mp_taxes', 'Taxes'), J('j_mp_pacifist', 'Pacifist'),
+      J('j_mp_speedrun', 'Speedrun'), J('j_mp_conjoined_joker', 'Conjoined Joker'),
+      J('j_mp_lets_go_gambling', "Let's Go Gambling"), J('j_mp_penny_pincher', 'Penny Pincher'),
+      J('j_mp_defensive_joker', 'Defensive Joker'), J('j_mp_copycat', 'Copycat'), J('j_mp_magnet', 'Magnet'),
+    ];
+    sect('MP-only jokers', 'Multiplayer-only jokers now render from the MP mod’s asset pack (still tagged with the MP badge).', `<div class="joker-row">${mpOnly.map(jokerCard).join('')}</div>`);
+
+    const many = [
+      J('j_joker', 'Joker', 'foil'), J('j_blueprint', 'Blueprint'), J('j_baron', 'Baron', 'negative'),
+      J('j_egg', 'Egg', null, ['Eternal']), J('j_misprint', 'Misprint'), J('j_fibonacci', 'Fibonacci', 'holo'),
+      J('j_mp_bloodstone', 'Bloodstone'), J('j_stone', 'Stone Joker'), J('j_mp_pizza', 'Pizza'),
+    ];
+    sect('More than five jokers', 'The viewer never caps the count; rows wrap. Here are 9.', `<div class="player-head"><span class="player-name">Demo Player</span><span class="joker-count">${many.length}</span></div><div class="joker-row">${many.map(jokerCard).join('')}</div>`);
+
+    /* ---- 5. Vouchers ---- */
+    const vouchers = ['v_overstock_norm', 'v_grabber', 'v_telescope', 'v_hieroglyph', 'v_blank', 'v_antimatter']
+      .map((key) => ({ key, name: key.replace(/^v_/, '').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) }));
+    sect('Vouchers', null, `<div class="voucher-row">${vouchers.map(voucherChip).join('')}</div>`);
+
+    /* ---- 6. Playing cards: enhancements / seals / editions ---- */
+    const ENH = ['m_bonus', 'm_mult', 'm_wild', 'm_glass', 'm_steel', 'm_stone', 'm_gold', 'm_lucky'];
+    const enhCards = ENH.map((e, i) => playingCard({ suit: ['S', 'H', 'C', 'D'][i % 4], rank: 'A', enhancement: e })).join('');
+    sect('Playing cards — enhancements', null, `<div class="cards-wrap">${enhCards}</div>`);
+
+    const SEALS = ['Red', 'Blue', 'Gold', 'Purple'];
+    const sealCards = SEALS.map((s, i) => playingCard({ suit: ['S', 'H', 'C', 'D'][i], rank: 'K', seal: s })).join('');
+    sect('Playing cards — seals', 'Seal stamps re-cropped to true size, placed in the corner.', `<div class="cards-wrap">${sealCards}</div>`);
+
+    const EDS = ['foil', 'holo', 'polychrome', 'negative'];
+    const edCards = EDS.map((e, i) => playingCard({ suit: ['S', 'H', 'C', 'D'][i], rank: 'Q', edition: e })).join('');
+    sect('Playing cards — editions', null, `<div class="cards-wrap">${edCards}</div>`);
+
+    const combo = [
+      { suit: 'H', rank: 'A', enhancement: 'm_glass', seal: 'Red', edition: 'polychrome' },
+      { suit: 'S', rank: 'K', enhancement: 'm_steel', seal: 'Blue', edition: 'foil' },
+      { suit: 'D', rank: 'Q', enhancement: 'm_gold', seal: 'Gold', edition: 'holo' },
+      { suit: 'C', rank: 'J', enhancement: 'm_lucky', seal: 'Purple', edition: 'negative' },
+    ];
+    sect('Playing cards — everything at once', 'Enhancement + seal + edition stacked.', `<div class="cards-wrap">${combo.map(playingCard).join('')}</div>`);
+
+    /* ---- 7. Full deck view (suit rows) ---- */
+    const full = [];
+    const ranks = ['A', 'K', 'Q', 'J', 'T', '9', '8', '7', '6', '5', '4', '3', '2'];
+    for (const suit of ['S', 'H', 'C', 'D']) for (const rank of ranks) full.push({ suit, rank });
+    full[0].enhancement = 'm_mult'; full[5].seal = 'Gold'; full[10].edition = 'polychrome';
+    full[20].enhancement = 'm_steel'; full[20].seal = 'Red'; full[30].edition = 'negative';
+    sect('Full deck view', 'The standard 52-card layout used in deck snapshots.', deckView(full));
+
+    root.innerHTML =
+      `<div class="demo-banner"><h1>Sprite &amp; Component Demo</h1>
+        <p>Every visual permutation rendered with the app's real components, followed by a full catalog of every extracted sprite.</p></div>` +
+      sections.join('') +
+      `<div id="catalog"><div class="loading">Loading sprite catalog…</div></div>`;
+
+    /* ---- Full catalog: literally every extracted sprite ---- */
+    // How each folder is presented: "card" = full card-size tile (preserves the
+    // 71×95 ratio), "square" = small icon tile. Unlisted folders default to card.
+    const SHAPE = {
+      seals: 'square', stickers: 'square', tags: 'square',
+      enhancements: 'card', backs: 'card', cards: 'card', jokers: 'card',
+      tarots: 'card', planets: 'card', spectrals: 'card', vouchers: 'card', boosters: 'card',
+    };
+    const FOLDER_NOTE = {
+      cards: 'Playing-card faces (8BitDeck.png).',
+      jokers: 'Includes vanilla + Multiplayer mod jokers.',
+      backs: 'Deck backs, including MP decks (b_mp_*) and Heidelberg.',
+      enhancements: 'Full-card textures applied behind the card face.',
+      seals: 'Stamps, re-cropped to true size.',
+      stickers: 'Joker stickers + stake chips, re-cropped to true size.',
+      tarots: 'Tarot consumables.', planets: 'Planet consumables.',
+      spectrals: 'Spectral consumables.', vouchers: 'Shop vouchers.',
+      boosters: 'Booster packs.', tags: 'Skip tags.',
+    };
+    const ORDER = ['cards', 'jokers', 'backs', 'enhancements', 'seals', 'stickers',
+      'tarots', 'planets', 'spectrals', 'vouchers', 'boosters', 'tags'];
+
+    fetch('/api/sprites').then((r) => r.json()).then(({ sprites }) => {
+      const folders = Object.keys(sprites);
+      folders.sort((a, b) => {
+        const ia = ORDER.indexOf(a), ib = ORDER.indexOf(b);
+        return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b);
+      });
+      const total = folders.reduce((n, f) => n + sprites[f].length, 0);
+      const panels = folders.map((folder) => {
+        const files = sprites[folder];
+        const shape = SHAPE[folder] || 'card';
+        const tiles = files.map((file) => {
+          const name = file.replace(/\.png$/, '');
+          const img = `<img class="cat-img ${shape}" src="assets/sprites/${folder}/${file}" alt="${name}" loading="lazy"
+            onerror="this.closest('.cat-tile').classList.add('cat-missing')">`;
+          return `<div class="cat-tile" title="${name}">${img}<span class="cat-cap">${name}</span></div>`;
+        }).join('');
+        return `<div class="panel"><h2><span class="accent"></span>${folder}
+          <span class="cat-count">${files.length}</span></h2>
+          ${FOLDER_NOTE[folder] ? `<div class="demo-sub">${FOLDER_NOTE[folder]}</div>` : ''}
+          <div class="cat-grid">${tiles}</div></div>`;
+      }).join('');
+      document.getElementById('catalog').innerHTML =
+        `<div class="demo-banner" style="margin-top:8px"><h1>Full Sprite Catalog</h1>
+          <p>${total} sprites across ${folders.length} folders — every PNG under <span class="mono">assets/sprites/</span>.</p></div>` + panels;
+    }).catch(() => {
+      document.getElementById('catalog').innerHTML =
+        `<div class="empty">Could not load the sprite catalog (is the server running?).</div>`;
+    });
+  })();
+  </script>
+</body>
+</html>

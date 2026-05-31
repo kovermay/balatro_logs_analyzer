@@ -90,6 +90,16 @@ function fmtDate(d) {
   return `${months[+mo - 1]} ${+da}, ${y}`;
 }
 function baseName(n) { return String(n || '').replace(/~\d+$/, ''); }
+// Deck back sprite key. deckKey usually arrives as a pretty name ("Red Deck"),
+// while sprites are filed under the internal key ("b_red"); derive it.
+const MP_DECK_KEYS = { cocktail: 'b_mp_cocktail', violet: 'b_mp_violet', orange: 'b_mp_orange' };
+function deckSpriteKey(g) {
+  const raw = (g && (g.deckKey || g.deckName)) || '';
+  if (!raw) return null;
+  if (/^b_/.test(raw)) return raw; // already an internal key (incl. b_mp_*)
+  const base = String(raw).replace(/\s*Deck$/i, '').trim().toLowerCase().replace(/\s+/g, '_');
+  return MP_DECK_KEYS[base] || ('b_' + base);
+}
 function hashHue(str) { let h = 0; for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) % 360; return h; }
 function monogram(name) {
   const parts = String(name).replace(/[^A-Za-z0-9 ]/g, '').split(/\s+/).filter(Boolean);
@@ -157,7 +167,11 @@ function resultBadge(r) {
   const label = r === 'win' ? 'Win' : r === 'loss' ? 'Loss' : 'Unfinished';
   return `<span class="result-badge ${r}">${label}</span>`;
 }
-function stakePip(s) { return s ? `<span class="stake-pip" style="background:${esc(s.color)}" title="${esc(s.name)}"></span>` : ''; }
+function stakePip(s) {
+  if (!s) return '';
+  const color = (s.name || '').split(' ')[0].toLowerCase();
+  return `<img class="stake-img" src="assets/sprites/stickers/stake_${esc(color)}.png" alt="${esc(s.name)}" title="${esc(s.name)}" onerror="this.outerHTML='<span class=stake-pip style=background:${esc(s.color)}></span>'">`;
+}
 
 function gameCard(s) {
   const fav = App.favorites.has(s.id);
@@ -194,14 +208,33 @@ function playingCard(c) {
   let style = '';
   if (c.enhancement) {
     const col = enhCol(c.enhancement);
-    style = ` style="background:linear-gradient(150deg,${shade(col, 16)},${shade(col, -18)});color:${inkFor(col)}"`;
+    // gradient is only a fallback for when the texture sprite fails to load;
+    // keep the suit-coloured pips (outlined in CSS) so they read on any texture.
+    style = ` style="background:linear-gradient(150deg,${shade(col, 16)},${shade(col, -18)})"`;
   }
-  const seal = c.seal ? `<span class="seal" style="background:${sealCol(c.seal)}"></span>` : '';
+  const sealKey = c.seal ? c.seal.toLowerCase() : null;
+  const seal = sealKey
+    ? `<img class="seal-img" src="assets/sprites/seals/${esc(sealKey)}.png" alt="${esc(c.seal)} Seal" title="${esc(c.seal)} Seal" onerror="this.outerHTML='<span class=seal style=background:${sealCol(c.seal)}></span>'">`
+    : '';
+  // Enhancement art is a full-card texture (steel/gold/glass/stone…); fill the
+  // whole card with it. The CSS gradient stays as a fallback if it fails to load.
+  const enhFill = c.enhancement
+    ? `<img class="enh-fill" src="assets/sprites/enhancements/${esc(c.enhancement)}.png" alt="${esc(ENH_NAME[c.enhancement] || c.enhancement)}" onerror="this.remove()">`
+    : '';
+  // Real card-face sprite (rank pips + figures) layered over the card body.
+  // Stone cards are intentionally blank. On load it hides the font fallback;
+  // on error the rank/suit text shows instead.
+  const showFace = c.suit && c.rank && c.enhancement !== 'm_stone';
+  const face = showFace
+    ? `<img class="card-face" src="assets/sprites/cards/${esc(c.suit)}_${esc(c.rank)}.png" alt="" loading="lazy" onload="this.closest('.pcard').classList.add('has-face')" onerror="this.remove()">`
+    : '';
+  const fontFallback = c.enhancement === 'm_stone' ? ''
+    : `<span class="r">${RANKS[c.rank] || c.rank}</span><span class="s">${SUIT_SYM[c.suit]}</span>`;
   const title = [RANKS[c.rank] + ' of ' + SUIT_NAME[c.suit],
     c.enhancement ? ENH_NAME[c.enhancement] : null,
     c.edition ? EDITION_LABEL[c.edition] : null,
     c.seal ? c.seal + ' Seal' : null].filter(Boolean).join(' · ');
-  return `<div class="${cls.join(' ')}"${style} title="${esc(title)}">${seal}<span class="r">${RANKS[c.rank] || c.rank}</span><span class="s">${SUIT_SYM[c.suit]}</span></div>`;
+  return `<div class="${cls.join(' ')}"${style} title="${esc(title)}">${enhFill}${face}${seal}${fontFallback}</div>`;
 }
 
 function deckView(cards) {
@@ -215,6 +248,7 @@ function deckView(cards) {
   return html + '</div>';
 }
 
+const STICKER_SPRITE = { eternal: 'eternal', perishable: 'perishable', rental: 'rental' };
 function jokerCard(j) {
   const cls = ['joker'];
   const isMp = j.key.startsWith('j_mp_');
@@ -222,19 +256,31 @@ function jokerCard(j) {
   if (j.edition) cls.push('ed-' + j.edition);
   const hue = hashHue(j.key);
   const edTag = j.edition ? `<span class="edition-tag ${j.edition}">${EDITION_LABEL[j.edition]}</span>` : '';
-  const sticks = (j.stickers || []).map((s) => `<span class="sticker-tag">${esc(s)}</span>`).join('');
+  const stickIcons = (j.stickers || []).map((s) => {
+    const k = STICKER_SPRITE[s.toLowerCase()];
+    return k
+      ? `<img class="joker-sticker" src="assets/sprites/stickers/${esc(k)}.png" alt="${esc(s)}" title="${esc(s)}" onerror="this.outerHTML='<span class=sticker-tag>${esc(s)}</span>'">`
+      : `<span class="sticker-tag">${esc(s)}</span>`;
+  }).join('');
+  // Multiplayer re-implements some vanilla jokers (j_mp_bloodstone …). They have
+  // no dedicated sprite, so fall back to the vanilla art by stripping the mp_ tag.
+  const spriteKey = isMp ? 'j_' + j.key.slice('j_mp_'.length) : j.key;
+  const spritePath = `assets/sprites/jokers/${esc(spriteKey)}.png`;
   return `<div class="${cls.join(' ')}" title="${esc(j.name)}${j.edition ? ' (' + EDITION_LABEL[j.edition] + ')' : ''}">
     ${isMp ? '<span class="jmp">MP</span>' : ''}
-    <div class="jart" style="background:linear-gradient(160deg,hsl(${hue} 48% 34%),hsl(${hue} 50% 17%))"><img class="jsprite" src="assets/jokers/${esc(j.key)}.png" alt="" loading="lazy" onload="this.parentNode.classList.add('has-img')" onerror="this.remove()"><span class="jmono">${esc(monogram(j.name))}</span></div>
-    <div class="jname">${esc(j.name)}</div>${edTag}${sticks}
+    <div class="jart" style="background:linear-gradient(160deg,hsl(${hue} 48% 34%),hsl(${hue} 50% 17%))">${spritePath ? `<img class="jsprite" src="${spritePath}" alt="" loading="lazy" onload="this.parentNode.classList.add('has-img')" onerror="this.remove()">` : ''}<span class="jmono">${esc(monogram(j.name))}</span></div>
+    <div class="jname">${esc(j.name)}</div>${edTag}${stickIcons}
   </div>`;
 }
-// style for monogram (injected once)
+// style for monogram + sprite (injected once)
 const _styleMono = document.createElement('style');
 _styleMono.textContent = '.jmono{font-weight:800;font-size:24px;color:rgba(255,255,255,.92);text-shadow:0 2px 4px rgba(0,0,0,.4)}.jsprite{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;z-index:1}.jart.has-img{background:#181c26 !important}.jart.has-img .jmono{display:none}';
 document.head.appendChild(_styleMono);
 
-function voucherChip(v) { return `<span class="voucher">${esc(v.name)}</span>`; }
+function voucherChip(v) {
+  const img = v.key ? `<img class="voucher-img" src="assets/sprites/vouchers/${esc(v.key)}.png" alt="" loading="lazy" onerror="this.remove()">` : '';
+  return `<span class="voucher">${img}<span class="voucher-name">${esc(v.name)}</span></span>`;
+}
 
 // ----------------------------- list view ----------------------------------
 function renderList(favoritesOnly) {
@@ -360,7 +406,7 @@ function detailsPanel(g) {
     <div class="kv-grid">
       ${kv('Your Role', `<span class="chip role-${(g.localRole || '').toLowerCase()}">${esc(g.localRole)}</span> ${esc(g.localName)}`)}
       ${kv('Winner', winner)}
-      ${kv('Deck', esc(g.deckName))}
+      ${kv('Deck', (deckSpriteKey(g) ? `<img class="deck-img" src="assets/sprites/backs/${esc(deckSpriteKey(g))}.png" alt="" onerror="this.remove()"> ` : '') + esc(g.deckName), 'with-icon')}
       ${kv('Stake', g.stakeInfo ? stakePip(g.stakeInfo) + ' ' + esc(g.stakeInfo.name) : '—')}
       ${kv('Ruleset', esc(g.rulesetLabel || '—'))}
       ${kv('Game Mode', esc(g.gamemodeLabel || '—'))}
@@ -414,7 +460,7 @@ function wireDeckToggles() {
 
 function jokersPanel(g) {
   const col = (p, name, isWin, you) => `<div>
-    <div class="player-head"><span class="player-name">${esc(name)} ${isWin ? '<span class="tag-winner">Winner</span>' : ''} ${you ? '<span class="tag-you">You</span>' : ''}</span></div>
+    <div class="player-head"><span class="player-name">${esc(name)} ${isWin ? '<span class="tag-winner">Winner</span>' : ''} ${you ? '<span class="tag-you">You</span>' : ''}</span>${p.jokers.length ? `<span class="joker-count">${p.jokers.length}</span>` : ''}</div>
     ${p.jokers.length ? `<div class="joker-row">${p.jokers.map(jokerCard).join('')}</div>` : '<div class="muted">No jokers recorded</div>'}</div>`;
   return `<div class="panel"><h2><span class="accent"></span>Final Jokers</h2>
     <div class="two-col">
